@@ -16,7 +16,7 @@
 
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="robot_admin_native_host_v644" />
+                android:value="robot_admin_native_host_v645" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
