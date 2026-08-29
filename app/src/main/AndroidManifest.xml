@@ -1,23 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <application
-        android:allowBackup="false"
-        android:label="Robot Admin AI OS"
-        android:hasCode="false"
-        android:supportsRtl="true"
-        android:usesCleartextTraffic="true">
-        <activity
-            android:name="android.app.NativeActivity"
-            android:exported="true"
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|keyboardHidden">
-            <meta-data android:name="android.app.lib_name" android:value="robot_admin_native_host_v646" />
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+    <application android:allowBackup="false" android:label="Robot Admin AI OS" android:hasCode="false" android:supportsRtl="true">
+        <activity android:name="android.app.NativeActivity" android:exported="true" android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden">
+            <meta-data android:name="android.app.lib_name" android:value="robot_admin_native_host_v647" />
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
     </application>
 </manifest>
