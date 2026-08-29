@@ -10,9 +10,9 @@ android {
     defaultConfig {
         applicationId 'com.robotadmin.aios'
         minSdk 21
-        targetSdk 37
-        versionCode 4
-        versionName '64.6-debug'
+        targetSdk 36
+        versionCode 5
+        versionName '64.7-debug'
         externalNativeBuild {
             cmake {
                 cppFlags '-std=c++17 -O2 -Wall -Wextra'
