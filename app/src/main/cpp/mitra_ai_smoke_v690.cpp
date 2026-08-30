@@ -14,7 +14,12 @@ int main() {
         std::strcmp(ra690_mitra_respond("ನಮಸ್ಕಾರ"),
                     "ನಮಸ್ಕಾರ. ಮಿತ್ರ AI ಸಹಾಯಕ್ಕೆ ಸಿದ್ಧವಾಗಿದೆ.") == 0 &&
         ra690_mitra_memory_count() >= 3 &&
-        std::strcmp(ra690_mitra_last_intent(), "GREETING") == 0;
+        std::strcmp(ra690_mitra_last_intent(), "GREETING") == 0 &&
+        std::strstr(ra690_mitra_respond("more"), "ready to help") != nullptr &&
+        ra690_mitra_approval_required("delete file") == 1 &&
+        std::strstr(ra690_mitra_respond("delete file"), "Approval required") != nullptr &&
+        std::strcmp(ra690_mitra_last_intent(), "APPROVAL_REQUIRED") == 0 &&
+        ra690_mitra_execute_blocked() == -403;
     std::cout << "MITRA_AI=" << (pass ? "PASS" : "FAIL") << '\n';
     std::cout << "SAFETY=LOCKED\n";
     return pass ? 0 : 1;

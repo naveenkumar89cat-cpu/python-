@@ -9,7 +9,7 @@
 
 namespace ra690 {
 
-enum class Intent { GREETING, STATUS, TASKS, BACKUP, SAFETY, UNKNOWN };
+enum class Intent { GREETING, STATUS, TASKS, BACKUP, SAFETY, APPROVAL_REQUIRED, UNKNOWN };
 
 struct ConversationMemory {
     std::array<Intent, 8> recent{};
@@ -29,6 +29,12 @@ static std::string lower_ascii(std::string value) {
 
 Intent classify(const std::string& input) {
     const std::string text = lower_ascii(input);
+    if (text.find("write") != std::string::npos || text.find("delete") != std::string::npos ||
+        text.find("restore") != std::string::npos || text.find("apply") != std::string::npos ||
+        text.find("execute") != std::string::npos || text.find("live order") != std::string::npos ||
+        input.find("ಅಳಿಸ") != std::string::npos || input.find("ಬರೆಯ") != std::string::npos ||
+        input.find("ರಿಸ್ಟೋರ್") != std::string::npos || input.find("ಅಪ್ಲೈ") != std::string::npos)
+        return Intent::APPROVAL_REQUIRED;
     if (text.find("hello") != std::string::npos || text.find("hi") != std::string::npos ||
         input.find("ನಮಸ್ಕಾರ") != std::string::npos) return Intent::GREETING;
     if (text.find("status") != std::string::npos || input.find("ಸ್ಥಿತಿ") != std::string::npos)
@@ -49,6 +55,7 @@ const char* reply(Intent intent) {
         case Intent::TASKS: return "I can review tasks. Execute remains approval-gated.";
         case Intent::BACKUP: return "I can verify backups. Restore and apply remain blocked.";
         case Intent::SAFETY: return "Safety is locked. Write, delete and auto-apply are off.";
+        case Intent::APPROVAL_REQUIRED: return "Approval required. No high-risk action was executed.";
         default: return "Please ask about status, tasks, backup or safety.";
     }
 }
@@ -68,6 +75,7 @@ const char* reply_kannada(Intent intent) {
         case Intent::TASKS: return "ಕಾರ್ಯಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು; ಕಾರ್ಯಗತಗೊಳಿಸಲು ಅನುಮೋದನೆ ಅಗತ್ಯ.";
         case Intent::BACKUP: return "ಬ್ಯಾಕಪ್ ಪರಿಶೀಲಿಸಬಹುದು; ರಿಸ್ಟೋರ್ ಮತ್ತು ಅಪ್ಲೈ ನಿರ್ಬಂಧಿತ.";
         case Intent::SAFETY: return "ಸುರಕ್ಷತೆ ಲಾಕ್ ಆಗಿದೆ; ಬರೆಯುವುದು ಮತ್ತು ಅಳಿಸುವುದು ಆಫ್.";
+        case Intent::APPROVAL_REQUIRED: return "ಅನುಮೋದನೆ ಅಗತ್ಯ. ಯಾವುದೇ ಅಪಾಯಕಾರಿ ಕಾರ್ಯ ನಡೆದಿಲ್ಲ.";
         default: return "ಸ್ಥಿತಿ, ಕಾರ್ಯ, ಬ್ಯಾಕಪ್ ಅಥವಾ ಸುರಕ್ಷತೆ ಕುರಿತು ಕೇಳಿ.";
     }
 }
@@ -92,8 +100,25 @@ const char* intent_name(Intent intent) {
         case Intent::TASKS: return "TASKS";
         case Intent::BACKUP: return "BACKUP";
         case Intent::SAFETY: return "SAFETY";
+        case Intent::APPROVAL_REQUIRED: return "APPROVAL_REQUIRED";
         default: return "UNKNOWN";
     }
+}
+
+static bool is_follow_up(const std::string& input) {
+    const std::string text = lower_ascii(input);
+    return text == "more" || text == "details" || text == "continue" || text == "why" ||
+        input.find("ಇನ್ನಷ್ಟು") != std::string::npos ||
+        input.find("ವಿವರ") != std::string::npos ||
+        input.find("ಮುಂದೆ") != std::string::npos ||
+        input.find("ಏಕೆ") != std::string::npos;
+}
+
+static Intent contextual_intent(const std::string& input) {
+    Intent intent = classify(input);
+    if (intent != Intent::UNKNOWN || !is_follow_up(input)) return intent;
+    std::lock_guard<std::mutex> guard(memory_mutex);
+    return memory.last;
 }
 
 } // namespace ra690
@@ -116,7 +141,7 @@ extern "C" int ra690_mitra_selftest() {
 extern "C" const char* ra690_mitra_respond(const char* input) {
     thread_local std::string response;
     const std::string request = input == nullptr ? "" : input;
-    const auto intent = ra690::classify(request);
+    const auto intent = ra690::contextual_intent(request);
     ra690::remember(intent);
     response = ra690::is_kannada(request) ? ra690::reply_kannada(intent) : ra690::reply(intent);
     return response.c_str();
@@ -132,6 +157,11 @@ extern "C" const char* ra690_mitra_last_intent() {
     return ra690::intent_name(ra690::memory.last);
 }
 
+extern "C" int ra690_mitra_approval_required(const char* input) {
+    return ra690::classify(input == nullptr ? "" : input) == ra690::Intent::APPROVAL_REQUIRED ? 1 : 0;
+}
+
 extern "C" int ra690_mitra_write_blocked() { return -403; }
 extern "C" int ra690_mitra_delete_blocked() { return -403; }
 extern "C" int ra690_mitra_apply_blocked() { return -403; }
+extern "C" int ra690_mitra_execute_blocked() { return -403; }
