@@ -1,0 +1,3 @@
+Check Robot Admin core
+Verify safety locks
+Review backup digest
