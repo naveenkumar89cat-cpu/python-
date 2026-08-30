@@ -50,3 +50,7 @@ jobs:
           strings "$SO" | grep -Fx 'CHAT INPUT'
           strings "$SO" | grep -Fx 'TAP CHAT INPUT'
           strings "$SO" | grep -Fx 'TYPE A COMMAND FIRST'
+          strings "$SO" | grep -Fx 'Type English or Kannada command, then tap SEND CHAT'
+          strings "$SO" | grep -Fx 'INPUT [UNICODE IME ACTIVE]'
+          strings "$SO" | grep -Fx 'SEND CHAT'
+          strings "$SO" | grep -Fx 'HISTORY: '

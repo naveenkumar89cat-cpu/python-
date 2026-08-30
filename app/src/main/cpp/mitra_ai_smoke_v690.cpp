@@ -33,6 +33,9 @@ int main() {
         ra690_mitra_executed_actions() == 0 &&
         std::strstr(ra690_mitra_respond("ಅಳಿಸು"), "PREVIEW #3: DELETE") != nullptr &&
         std::strstr(ra690_mitra_respond("ರದ್ದು"), "CANCELLED: DELETE") != nullptr &&
+        ra690_mitra_history_count() == 8 &&
+        std::strcmp(ra690_mitra_history_input(7), "ರದ್ದು") == 0 &&
+        std::strstr(ra690_mitra_history_reply(7), "CANCELLED: DELETE") != nullptr &&
         ra690_mitra_executed_actions() == 0 &&
         ra690_mitra_execute_blocked() == -403;
     std::cout << "MITRA_AI=" << (pass ? "PASS" : "FAIL") << '\n';

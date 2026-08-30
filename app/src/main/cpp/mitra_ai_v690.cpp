@@ -23,6 +23,15 @@ struct ConversationMemory {
 static ConversationMemory memory;
 static std::mutex memory_mutex;
 
+struct ChatEntry {
+    std::string input;
+    std::string reply;
+};
+
+static std::array<ChatEntry, 8> chat_history;
+static std::size_t chat_history_count = 0;
+static std::mutex chat_history_mutex;
+
 struct ApprovalGate {
     GateState state = GateState::IDLE;
     RiskAction action = RiskAction::NONE;
@@ -45,6 +54,41 @@ static std::string trim_ascii(std::string value) {
     if (first == std::string::npos) return {};
     const auto last = value.find_last_not_of(" \t\r\n");
     return value.substr(first, last - first + 1);
+}
+
+static std::string utf8_prefix(const std::string& value, std::size_t max_codepoints) {
+    std::size_t offset = 0;
+    std::size_t count = 0;
+    while (offset < value.size() && count < max_codepoints) {
+        const unsigned char lead = static_cast<unsigned char>(value[offset]);
+        std::size_t width = 1;
+        if ((lead & 0xE0U) == 0xC0U) width = 2;
+        else if ((lead & 0xF0U) == 0xE0U) width = 3;
+        else if ((lead & 0xF8U) == 0xF0U) width = 4;
+        if (offset + width > value.size()) break;
+        bool valid = true;
+        for (std::size_t i = 1; i < width; ++i) {
+            if ((static_cast<unsigned char>(value[offset + i]) & 0xC0U) != 0x80U) {
+                valid = false;
+                break;
+            }
+        }
+        offset += valid ? width : 1;
+        ++count;
+    }
+    return value.substr(0, offset);
+}
+
+static void record_chat(const std::string& input, const std::string& response) {
+    ChatEntry entry{utf8_prefix(input, 96), utf8_prefix(response, 160)};
+    std::lock_guard<std::mutex> guard(chat_history_mutex);
+    if (chat_history_count < chat_history.size()) {
+        chat_history[chat_history_count++] = std::move(entry);
+        return;
+    }
+    for (std::size_t i = 1; i < chat_history.size(); ++i)
+        chat_history[i - 1] = std::move(chat_history[i]);
+    chat_history.back() = std::move(entry);
 }
 
 static RiskAction risk_action(const std::string& input) {
@@ -259,19 +303,16 @@ extern "C" const char* ra690_mitra_respond(const char* input) {
     const bool kannada = ra690::is_kannada(request);
     if (ra690::is_approve_command(request)) {
         response = ra690::approve_command(kannada);
-        return response.c_str();
-    }
-    if (ra690::is_cancel_command(request)) {
+    } else if (ra690::is_cancel_command(request)) {
         response = ra690::cancel_command(kannada);
-        return response.c_str();
-    }
-    if (ra690::risk_action(request) != ra690::RiskAction::NONE) {
+    } else if (ra690::risk_action(request) != ra690::RiskAction::NONE) {
         response = ra690::preview_command(request, kannada);
-        return response.c_str();
+    } else {
+        const auto intent = ra690::contextual_intent(request);
+        ra690::remember(intent);
+        response = kannada ? ra690::reply_kannada(intent) : ra690::reply(intent);
     }
-    const auto intent = ra690::contextual_intent(request);
-    ra690::remember(intent);
-    response = kannada ? ra690::reply_kannada(intent) : ra690::reply(intent);
+    ra690::record_chat(request, response);
     return response.c_str();
 }
 
@@ -314,6 +355,27 @@ extern "C" int ra690_mitra_has_pending_approval() {
 }
 
 extern "C" int ra690_mitra_executed_actions() { return 0; }
+
+extern "C" int ra690_mitra_history_count() {
+    std::lock_guard<std::mutex> guard(ra690::chat_history_mutex);
+    return static_cast<int>(ra690::chat_history_count);
+}
+
+extern "C" const char* ra690_mitra_history_input(int index) {
+    thread_local std::string value;
+    std::lock_guard<std::mutex> guard(ra690::chat_history_mutex);
+    value = index >= 0 && static_cast<std::size_t>(index) < ra690::chat_history_count
+        ? ra690::chat_history[static_cast<std::size_t>(index)].input : "";
+    return value.c_str();
+}
+
+extern "C" const char* ra690_mitra_history_reply(int index) {
+    thread_local std::string value;
+    std::lock_guard<std::mutex> guard(ra690::chat_history_mutex);
+    value = index >= 0 && static_cast<std::size_t>(index) < ra690::chat_history_count
+        ? ra690::chat_history[static_cast<std::size_t>(index)].reply : "";
+    return value.c_str();
+}
 
 extern "C" int ra690_mitra_write_blocked() { return -403; }
 extern "C" int ra690_mitra_delete_blocked() { return -403; }
