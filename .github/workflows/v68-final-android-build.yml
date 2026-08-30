@@ -55,3 +55,39 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+  final-lock-audit:
+    needs: android-arm64-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download final checkpoint APK
+        uses: actions/download-artifact@v5
+        with:
+          name: robot-admin-ai-os-v68.8-final-arm64-debug
+          path: /tmp/robot-admin-v690
+
+      - name: Verify APK structure and ARM64 native core
+        run: |
+          set -euo pipefail
+          APK=/tmp/robot-admin-v690/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'lib/arm64-v8a/librobot_admin_native_host_v687.so'
+          unzip -Z1 "$APK" | grep -Fx 'assets/v673/sample.csv'
+          unzip -Z1 "$APK" | grep -Fx 'assets/v673/tasks.txt'
+          unzip -Z1 "$APK" | grep -Fx 'assets/v673/verify.txt'
+          unzip -p "$APK" lib/arm64-v8a/librobot_admin_native_host_v687.so > /tmp/robot-admin-v690/native.so
+          readelf -h /tmp/robot-admin-v690/native.so | grep -F 'AArch64'
+
+      - name: Verify permanent safety wall
+        run: |
+          set -euo pipefail
+          strings /tmp/robot-admin-v690/native.so > /tmp/robot-admin-v690/native.strings
+          grep -Fx 'SAFETY: LOCKED' /tmp/robot-admin-v690/native.strings
+          grep -Fx 'LIVE ORDERS: OFF' /tmp/robot-admin-v690/native.strings
+          grep -Fx 'AUTO UPDATE: OFF' /tmp/robot-admin-v690/native.strings
+          grep -Fx 'PROD GATE: CLOSED' /tmp/robot-admin-v690/native.strings
+          grep -Fx 'WRITE/DELETE/RESTORE/APPLY: OFF' /tmp/robot-admin-v690/native.strings
+
+      - name: Record final APK SHA256
+        run: sha256sum /tmp/robot-admin-v690/app-debug.apk
