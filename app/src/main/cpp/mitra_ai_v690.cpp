@@ -59,7 +59,12 @@ extern "C" int ra690_mitra_selftest() {
         ? 0 : 1;
 }
 
+extern "C" const char* ra690_mitra_respond(const char* input) {
+    thread_local std::string response;
+    response = ra690::reply(ra690::classify(input == nullptr ? "" : input));
+    return response.c_str();
+}
+
 extern "C" int ra690_mitra_write_blocked() { return -403; }
 extern "C" int ra690_mitra_delete_blocked() { return -403; }
 extern "C" int ra690_mitra_apply_blocked() { return -403; }
-
