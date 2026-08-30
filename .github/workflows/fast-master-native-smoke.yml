@@ -1,0 +1,25 @@
+name: FAST MASTER Native Smoke
+
+on:
+  push:
+    branches: [ robot-admin-v681-mega ]
+    paths:
+      - 'app/src/main/cpp/**'
+      - '.github/workflows/fast-master-native-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  native-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Compile V68.8 FAST MASTER smoke test
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            app/src/main/cpp/fast_master_smoke_v688.cpp \
+            -o /tmp/fast_master_smoke_v688
+
+      - name: Run V68.8 FAST MASTER regression
+        run: /tmp/fast_master_smoke_v688
