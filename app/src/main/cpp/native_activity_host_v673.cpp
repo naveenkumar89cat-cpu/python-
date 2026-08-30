@@ -1,98 +1,33 @@
-#define ANativeActivity_onCreate ANativeActivity_onCreate_v672_legacy
-#include "native_activity_host_v672.cpp"
+#define ANativeActivity_onCreate ANativeActivity_onCreate_v658_legacy
+#include "native_activity_host_v658.cpp"
 #undef ANativeActivity_onCreate
 #include <android/asset_manager.h>
+#include <sstream>
+#include <iomanip>
+#include <vector>
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
 
 namespace {
-std::atomic<bool> run673{false};
-std::atomic<int> page673{0};
-std::atomic<int> touches673{0};
-AInputQueue* input673=nullptr;
-ANativeWindow* window673=nullptr;
-std::thread loop673;
-int w673=0,h673=0;
-std::mutex data673;
-std::string taskState673="ASSET MISSING";
-std::string taskPreview673="NO TASK DATA";
-std::string csvName673="ASSET MISSING";
-std::string verifyTarget673="ASSET MISSING";
-std::string sha673="PENDING";
-int csvRows673=0,csvCols673=0,csvNum673=0;
-int assetCount673=0;
+std::atomic<bool> run673{false}; std::atomic<int> page673{0}; std::atomic<int> touches673{0};
+AInputQueue* input673=nullptr; ANativeWindow* window673=nullptr; std::thread loop673; int w673=0,h673=0;
+std::mutex data673; std::string taskState673="ASSET MISSING",taskPreview673="NO TASK DATA",csvName673="ASSET MISSING",verifyTarget673="ASSET MISSING",sha673="PENDING";
+int csvRows673=0,csvCols673=0,csvNum673=0,assetCount673=0;
 enum {P673_HOME=0,P673_FILES=1,P673_TASKS=2,P673_VERIFY=3,P673_DATA=4};
 
-bool readAsset673(AAssetManager*m,const char*name,std::string&out){
-    if(!m)return false;
-    AAsset*a=AAssetManager_open(m,name,AASSET_MODE_BUFFER);
-    if(!a)return false;
-    off_t n=AAsset_getLength(a);
-    const void*p=AAsset_getBuffer(a);
-    if(p&&n>=0)out.assign((const char*)p,(size_t)n);else out.clear();
-    AAsset_close(a);
-    return true;
-}
-void loadAssets673(AAssetManager*m){
-    std::lock_guard<std::mutex>g(data673);
-    assetCount673=0; csvRows673=csvCols673=csvNum673=0;
-    std::string tasks,csv,verify;
-    if(readAsset673(m,"v673/tasks.txt",tasks)){
-        assetCount673++;
-        std::stringstream ss(tasks); std::string line; int n=0;
-        while(std::getline(ss,line)){if(n==0)taskPreview673=safe672(line,26);n++;}
-        taskState673="FOUND "+std::to_string(n)+" LINES";
-    }
-    if(readAsset673(m,"v673/sample.csv",csv)){
-        assetCount673++; csvName673="SAMPLE.CSV";
-        std::stringstream fs(csv); std::string line;
-        while(std::getline(fs,line)){
-            csvRows673++; int cols=1; for(char c:line)if(c==',')cols++; csvCols673=std::max(csvCols673,cols);
-            std::stringstream ls(line); std::string cell;
-            while(std::getline(ls,cell,',')){char*end=nullptr;std::strtod(cell.c_str(),&end);if(end&&end!=cell.c_str()){while(*end&&std::isspace((unsigned char)*end))end++;if(*end==0)csvNum673++;}}
-        }
-    }
-    if(readAsset673(m,"v673/verify.txt",verify)){
-        assetCount673++; verifyTarget673="VERIFY.TXT";
-        sha673=sha256_672((const unsigned char*)verify.data(),verify.size());
-    }
-}
+std::string safe673(std::string s,size_t maxn=26){for(char&c:s){unsigned char u=(unsigned char)c;c=(char)std::toupper(u);if(!std::isalnum((unsigned char)c)&&c!='.'&&c!='-'&&c!='_')c='-';}if(s.size()>maxn)s.resize(maxn);return s.empty()?"NONE":s;}
+static inline uint32_t ror673(uint32_t x,uint32_t n){return(x>>n)|(x<<(32-n));}
+std::string sha256_673(const unsigned char*data,size_t len){static const uint32_t k[64]={0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};uint64_t bits=(uint64_t)len*8;size_t total=((len+9+63)/64)*64;std::vector<unsigned char>m(total,0);if(len)std::copy(data,data+len,m.begin());m[len]=0x80;for(int i=0;i<8;i++)m[total-1-i]=(unsigned char)(bits>>(8*i));uint32_t h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(size_t o=0;o<total;o+=64){uint32_t w[64]{};for(int i=0;i<16;i++){size_t p=o+i*4;w[i]=((uint32_t)m[p]<<24)|((uint32_t)m[p+1]<<16)|((uint32_t)m[p+2]<<8)|m[p+3];}for(int i=16;i<64;i++){uint32_t a=ror673(w[i-15],7)^ror673(w[i-15],18)^(w[i-15]>>3),b=ror673(w[i-2],17)^ror673(w[i-2],19)^(w[i-2]>>10);w[i]=w[i-16]+a+w[i-7]+b;}uint32_t a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(int i=0;i<64;i++){uint32_t s1=ror673(e,6)^ror673(e,11)^ror673(e,25),ch=(e&f)^((~e)&g),t1=h+s1+ch+k[i]+w[i],s0=ror673(a,2)^ror673(a,13)^ror673(a,22),maj=(a&b)^(a&c)^(b&c),t2=s0+maj;h=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2;}h0+=a;h1+=b;h2+=c;h3+=d;h4+=e;h5+=f;h6+=g;h7+=h;}std::ostringstream o;o<<std::hex<<std::setfill('0');for(uint32_t v:{h0,h1,h2,h3,h4,h5,h6,h7})o<<std::setw(8)<<v;return o.str();}
+bool readAsset673(AAssetManager*m,const char*name,std::string&out){if(!m)return false;AAsset*a=AAssetManager_open(m,name,AASSET_MODE_BUFFER);if(!a)return false;off_t n=AAsset_getLength(a);const void*p=AAsset_getBuffer(a);if(p&&n>=0)out.assign((const char*)p,(size_t)n);else out.clear();AAsset_close(a);return true;}
+void loadAssets673(AAssetManager*m){std::lock_guard<std::mutex>g(data673);assetCount673=0;csvRows673=csvCols673=csvNum673=0;std::string tasks,csv,verify;if(readAsset673(m,"v673/tasks.txt",tasks)){assetCount673++;std::stringstream ss(tasks);std::string line;int n=0;while(std::getline(ss,line)){if(n==0)taskPreview673=safe673(line);n++;}taskState673="FOUND "+std::to_string(n)+" LINES";}if(readAsset673(m,"v673/sample.csv",csv)){assetCount673++;csvName673="SAMPLE.CSV";std::stringstream fs(csv);std::string line;while(std::getline(fs,line)){csvRows673++;int cols=1;for(char c:line)if(c==',')cols++;csvCols673=std::max(csvCols673,cols);std::stringstream ls(line);std::string cell;while(std::getline(ls,cell,',')){char*end=nullptr;std::strtod(cell.c_str(),&end);if(end&&end!=cell.c_str()){while(*end&&std::isspace((unsigned char)*end))end++;if(*end==0)csvNum673++;}}}}if(readAsset673(m,"v673/verify.txt",verify)){assetCount673++;verifyTarget673="VERIFY.TXT";sha673=sha256_673((const unsigned char*)verify.data(),verify.size());}}
 const char* title673(int p){switch(p){case P673_FILES:return"PACKAGED FILES RO";case P673_TASKS:return"TASKS REAL DATA RO";case P673_VERIFY:return"REAL FILE SHA256";case P673_DATA:return"CSV REAL DATA TEST";default:return"V67.3 DATA TEST";}}
-bool draw673(ANativeWindow*w){
-    if(!w)return false;EGLDisplay d=eglGetDisplay(EGL_DEFAULT_DISPLAY);if(d==EGL_NO_DISPLAY||!eglInitialize(d,nullptr,nullptr))return false;
-    const EGLint ca[]={EGL_SURFACE_TYPE,EGL_WINDOW_BIT,EGL_RENDERABLE_TYPE,EGL_OPENGL_ES2_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_NONE};
-    EGLConfig c=nullptr;EGLint n=0;if(!eglChooseConfig(d,ca,&c,1,&n)||n<1){eglTerminate(d);return false;}EGLint f=0;eglGetConfigAttrib(d,c,EGL_NATIVE_VISUAL_ID,&f);ANativeWindow_setBuffersGeometry(w,0,0,f);
-    EGLSurface su=eglCreateWindowSurface(d,c,w,nullptr);const EGLint xa[]={EGL_CONTEXT_CLIENT_VERSION,2,EGL_NONE};EGLContext x=eglCreateContext(d,c,EGL_NO_CONTEXT,xa);
-    if(su==EGL_NO_SURFACE||x==EGL_NO_CONTEXT||!eglMakeCurrent(d,su,su,x)){if(x!=EGL_NO_CONTEXT)eglDestroyContext(d,x);if(su!=EGL_NO_SURFACE)eglDestroySurface(d,su);eglTerminate(d);return false;}
-    EGLint W=0,H=0;eglQuerySurface(d,su,EGL_WIDTH,&W);eglQuerySurface(d,su,EGL_HEIGHT,&H);w673=W;h673=H;glViewport(0,0,W,H);glClearColor(.025f,.07f,.15f,1);glClear(GL_COLOR_BUFFER_BIT);
-    int s=W/310;if(s<3)s=3;if(s>5)s=5;int lx=5*s,rx=W/2+14*s,top=H-22*s,row=9*s,p=page673.load();
-    text("ROBOT ADMIN AI OS",lx,top,s,.92f,.96f,1);text("V67.3 REAL DATA",rx,top,s,.6f,.75f,.95f);
-    text("CPP CORE: READY",lx,top-row,s,.35f,.9f,.55f);text("SAFETY: LOCKED",rx,top-row,s,.35f,.9f,.55f);
-    text("MODE: OFFLINE FIRST",lx,top-2*row,s,.75f,.85f,.95f);text("CONTROL: READ ONLY",rx,top-2*row,s,.75f,.85f,.95f);
-    text("LOCKED BASE: V67.1",lx,top-3*row,s,.55f,.8f,.95f);text("WRITE: OFF",rx,top-3*row,s,.95f,.55f,.3f);
-    text("TOUCH COUNT: "+std::to_string(touches673.load()),lx,top-4*row,s,.55f,.8f,.95f);text("DELETE: OFF",rx,top-4*row,s,.95f,.55f,.3f);
-    int py=top-6*row;text(title673(p),lx,py,s,.35f,.9f,.55f);std::lock_guard<std::mutex>g(data673);
-    if(p==P673_HOME){text("PACKAGED FILES: "+std::to_string(assetCount673),lx,py-row,s,.75f,.85f,.95f);text("TASKS: "+taskState673,lx,py-2*row,s,.75f,.85f,.95f);text("SHA256: READY",lx,py-3*row,s,.35f,.9f,.55f);text("CSV: "+csvName673,lx,py-4*row,s,.75f,.85f,.95f);}
-    else if(p==P673_FILES){text("SCOPE: APK ASSETS",lx,py-row,s,.75f,.85f,.95f);text("COUNT: "+std::to_string(assetCount673),lx,py-2*row,s,.75f,.85f,.95f);text("F1: TASKS.TXT",lx,py-3*row,s,.75f,.85f,.95f);text("F2: SAMPLE.CSV",lx,py-4*row,s,.75f,.85f,.95f);text("F3: VERIFY.TXT",lx,py-5*row,s,.75f,.85f,.95f);}
-    else if(p==P673_TASKS){text("TASK FILE: "+taskState673,lx,py-row,s,.75f,.85f,.95f);text("PREVIEW: "+taskPreview673,lx,py-2*row,s,.75f,.85f,.95f);text("CREATE: BLOCKED",lx,py-3*row,s,.95f,.55f,.3f);text("APPLY: BLOCKED",lx,py-4*row,s,.95f,.55f,.3f);}
-    else if(p==P673_VERIFY){text("TARGET: "+verifyTarget673,lx,py-row,s,.75f,.85f,.95f);text("SHA256 ENGINE: READY",lx,py-2*row,s,.35f,.9f,.55f);text("HASH: "+sha673.substr(0,20),lx,py-3*row,s,.75f,.85f,.95f);text("RESTORE: BLOCKED",lx,py-4*row,s,.95f,.55f,.3f);}
-    else{text("CSV: "+csvName673,lx,py-row,s,.75f,.85f,.95f);text("ROWS: "+std::to_string(csvRows673),lx,py-2*row,s,.75f,.85f,.95f);text("COLS: "+std::to_string(csvCols673),lx,py-3*row,s,.75f,.85f,.95f);text("NUM CELLS: "+std::to_string(csvNum673),lx,py-4*row,s,.75f,.85f,.95f);}
-    int sy=py+2*row;text("RESTORE/APPLY: OFF",rx,sy,s,.95f,.55f,.3f);text("LIVE ORDERS: OFF",rx,sy-row,s,.95f,.55f,.3f);text("AUTO UPDATE: OFF",rx,sy-2*row,s,.95f,.55f,.3f);text("PROD GATE: CLOSED",rx,sy-3*row,s,.95f,.55f,.3f);
-    int bh=14*s,by=4*s,gap=2*s,bw=(W-6*gap)/5;const char*bn[5]={"HOME","FILES","TASKS","VERIFY","DATA"};for(int i=0;i<5;i++){float gg=(p==i)?.48f:.27f;rect(gap+i*(bw+gap),by,bw,bh,.08f,gg,.28f);text(bn[i],gap+i*(bw+gap)+2*s,by+4*s,s,.92f,.96f,1);}eglSwapBuffers(d,su);eglMakeCurrent(d,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);eglDestroyContext(d,x);eglDestroySurface(d,su);eglTerminate(d);return true;
-}
-int input_cb673(int,int,void*){if(!input673)return 1;AInputEvent*e=nullptr;while(AInputQueue_getEvent(input673,&e)>=0){if(AInputQueue_preDispatchEvent(input673,e))continue;int handled=0;if(AInputEvent_getType(e)==AINPUT_EVENT_TYPE_MOTION&&AMotionEvent_getAction(e)==AMOTION_EVENT_ACTION_UP){float px=AMotionEvent_getX(e,0),py=(float)h673-AMotionEvent_getY(e,0);int s=w673/310;if(s<3)s=3;if(s>5)s=5;int gap=2*s,bw=(w673-6*gap)/5,bh=14*s;if(py>=4*s&&py<=4*s+bh){for(int i=0;i<5;i++){int bx=gap+i*(bw+gap);if(px>=bx&&px<=bx+bw){page673=i;touches673++;handled=1;break;}}}}else if(AInputEvent_getType(e)==AINPUT_EVENT_TYPE_KEY&&AKeyEvent_getAction(e)==AKEY_EVENT_ACTION_UP&&AKeyEvent_getKeyCode(e)==AKEYCODE_BACK){page673=P673_HOME;touches673++;handled=1;}AInputQueue_finishEvent(input673,e,handled);}return 1;}
+bool draw673(ANativeWindow*w){if(!w)return false;EGLDisplay d=eglGetDisplay(EGL_DEFAULT_DISPLAY);if(d==EGL_NO_DISPLAY||!eglInitialize(d,nullptr,nullptr))return false;const EGLint ca[]={EGL_SURFACE_TYPE,EGL_WINDOW_BIT,EGL_RENDERABLE_TYPE,EGL_OPENGL_ES2_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_NONE};EGLConfig c=nullptr;EGLint n=0;if(!eglChooseConfig(d,ca,&c,1,&n)||n<1){eglTerminate(d);return false;}EGLint f=0;eglGetConfigAttrib(d,c,EGL_NATIVE_VISUAL_ID,&f);ANativeWindow_setBuffersGeometry(w,0,0,f);EGLSurface su=eglCreateWindowSurface(d,c,w,nullptr);const EGLint xa[]={EGL_CONTEXT_CLIENT_VERSION,2,EGL_NONE};EGLContext x=eglCreateContext(d,c,EGL_NO_CONTEXT,xa);if(su==EGL_NO_SURFACE||x==EGL_NO_CONTEXT||!eglMakeCurrent(d,su,su,x)){if(x!=EGL_NO_CONTEXT)eglDestroyContext(d,x);if(su!=EGL_NO_SURFACE)eglDestroySurface(d,su);eglTerminate(d);return false;}EGLint W=0,H=0;eglQuerySurface(d,su,EGL_WIDTH,&W);eglQuerySurface(d,su,EGL_HEIGHT,&H);w673=W;h673=H;glViewport(0,0,W,H);glClearColor(.025f,.07f,.15f,1);glClear(GL_COLOR_BUFFER_BIT);int s=W/310;if(s<3)s=3;if(s>5)s=5;int lx=5*s,rx=W/2+14*s,top=H-22*s,row=9*s,p=page673.load();text("ROBOT ADMIN AI OS",lx,top,s,.92f,.96f,1);text("V67.3 REAL DATA",rx,top,s,.6f,.75f,.95f);text("CPP CORE: READY",lx,top-row,s,.35f,.9f,.55f);text("SAFETY: LOCKED",rx,top-row,s,.35f,.9f,.55f);text("MODE: OFFLINE FIRST",lx,top-2*row,s,.75f,.85f,.95f);text("CONTROL: READ ONLY",rx,top-2*row,s,.75f,.85f,.95f);text("LOCKED BASE: V67.1",lx,top-3*row,s,.55f,.8f,.95f);text("WRITE: OFF",rx,top-3*row,s,.95f,.55f,.3f);text("TOUCH COUNT: "+std::to_string(touches673.load()),lx,top-4*row,s,.55f,.8f,.95f);text("DELETE: OFF",rx,top-4*row,s,.95f,.55f,.3f);int py=top-6*row;text(title673(p),lx,py,s,.35f,.9f,.55f);std::lock_guard<std::mutex>g(data673);if(p==P673_HOME){text("PACKAGED FILES: "+std::to_string(assetCount673),lx,py-row,s,.75f,.85f,.95f);text("TASKS: "+taskState673,lx,py-2*row,s,.75f,.85f,.95f);text("SHA256: READY",lx,py-3*row,s,.35f,.9f,.55f);text("CSV: "+csvName673,lx,py-4*row,s,.75f,.85f,.95f);}else if(p==P673_FILES){text("SCOPE: APK ASSETS",lx,py-row,s,.75f,.85f,.95f);text("COUNT: "+std::to_string(assetCount673),lx,py-2*row,s,.75f,.85f,.95f);text("F1: TASKS.TXT",lx,py-3*row,s,.75f,.85f,.95f);text("F2: SAMPLE.CSV",lx,py-4*row,s,.75f,.85f,.95f);text("F3: VERIFY.TXT",lx,py-5*row,s,.75f,.85f,.95f);}else if(p==P673_TASKS){text("TASK FILE: "+taskState673,lx,py-row,s,.75f,.85f,.95f);text("PREVIEW: "+taskPreview673,lx,py-2*row,s,.75f,.85f,.95f);text("CREATE: BLOCKED",lx,py-3*row,s,.95f,.55f,.3f);text("APPLY: BLOCKED",lx,py-4*row,s,.95f,.55f,.3f);}else if(p==P673_VERIFY){text("TARGET: "+verifyTarget673,lx,py-row,s,.75f,.85f,.95f);text("SHA256 ENGINE: READY",lx,py-2*row,s,.35f,.9f,.55f);text("HASH: "+sha673.substr(0,20),lx,py-3*row,s,.75f,.85f,.95f);text("RESTORE: BLOCKED",lx,py-4*row,s,.95f,.55f,.3f);}else{text("CSV: "+csvName673,lx,py-row,s,.75f,.85f,.95f);text("ROWS: "+std::to_string(csvRows673),lx,py-2*row,s,.75f,.85f,.95f);text("COLS: "+std::to_string(csvCols673),lx,py-3*row,s,.75f,.85f,.95f);text("NUM CELLS: "+std::to_string(csvNum673),lx,py-4*row,s,.75f,.85f,.95f);}int sy=py+2*row;text("RESTORE/APPLY: OFF",rx,sy,s,.95f,.55f,.3f);text("LIVE ORDERS: OFF",rx,sy-row,s,.95f,.55f,.3f);text("AUTO UPDATE: OFF",rx,sy-2*row,s,.95f,.55f,.3f);text("PROD GATE: CLOSED",rx,sy-3*row,s,.95f,.55f,.3f);int bh=14*s,by=4*s,gap=2*s,bw=(W-6*gap)/5;const char*bn[5]={"HOME","FILES","TASKS","VERIFY","DATA"};for(int i=0;i<5;i++){float gg=(p==i)?.48f:.27f;rect(gap+i*(bw+gap),by,bw,bh,.08f,gg,.28f);text(bn[i],gap+i*(bw+gap)+2*s,by+4*s,s,.92f,.96f,1);}eglSwapBuffers(d,su);eglMakeCurrent(d,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);eglDestroyContext(d,x);eglDestroySurface(d,su);eglTerminate(d);return true;}
+int input_cb673(int,int,void*){if(!input673)return 1;AInputEvent*e=nullptr;while(AInputQueue_getEvent(input673,&e)>=0){if(AInputQueue_preDispatchEvent(input673,e))continue;int handled=0;if(AInputEvent_getType(e)==AINPUT_EVENT_TYPE_MOTION&&(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK)==AMOTION_EVENT_ACTION_UP){float px=AMotionEvent_getX(e,0),py=(float)h673-AMotionEvent_getY(e,0);int s=w673/310;if(s<3)s=3;if(s>5)s=5;int gap=2*s,bw=(w673-6*gap)/5,bh=14*s;if(py>=4*s&&py<=4*s+bh){for(int i=0;i<5;i++){int bx=gap+i*(bw+gap);if(px>=bx&&px<=bx+bw){page673=i;touches673++;handled=1;break;}}}}else if(AInputEvent_getType(e)==AINPUT_EVENT_TYPE_KEY&&AKeyEvent_getAction(e)==AKEY_EVENT_ACTION_UP&&AKeyEvent_getKeyCode(e)==AKEYCODE_BACK){page673=P673_HOME;touches673++;handled=1;}AInputQueue_finishEvent(input673,e,handled);}return 1;}
 void loop_fn673(){ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);while(run673){if(window673)draw673(window673);ALooper_pollOnce(120,nullptr,nullptr,nullptr);}}
-void win_create673(ANativeActivity*,ANativeWindow*w){window673=w;}
-void win_destroy673(ANativeActivity*,ANativeWindow*){window673=nullptr;}
-void iq_create673(ANativeActivity*,AInputQueue*q){input673=q;AInputQueue_attachLooper(q,ALooper_forThread(),1,input_cb673,nullptr);}
-void iq_destroy673(ANativeActivity*,AInputQueue*q){AInputQueue_detachLooper(q);if(input673==q)input673=nullptr;}
+void win_create673(ANativeActivity*,ANativeWindow*w){window673=w;} void win_destroy673(ANativeActivity*,ANativeWindow*){window673=nullptr;}
+void iq_create673(ANativeActivity*,AInputQueue*q){input673=q;ALooper*l=ALooper_forThread();if(!l)l=ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);AInputQueue_attachLooper(q,l,1,input_cb673,nullptr);} void iq_destroy673(ANativeActivity*,AInputQueue*q){AInputQueue_detachLooper(q);if(input673==q)input673=nullptr;}
 void destroy673(ANativeActivity*){run673=false;if(loop673.joinable())loop673.join();}
 }
 extern "C" void ANativeActivity_onCreate(ANativeActivity*a,void*,size_t){loadAssets673(a->assetManager);a->callbacks->onNativeWindowCreated=win_create673;a->callbacks->onNativeWindowDestroyed=win_destroy673;a->callbacks->onInputQueueCreated=iq_create673;a->callbacks->onInputQueueDestroyed=iq_destroy673;a->callbacks->onDestroy=destroy673;run673=true;loop673=std::thread(loop_fn673);}
-extern "C" const char* ra673_version(){return "67.3";}
-extern "C" int ra673_core_ready(){return 1;}
-extern "C" int ra673_asset_data_ready(){return assetCount673==3?1:0;}
-extern "C" int ra673_write(){return -403;}
-extern "C" int ra673_delete(){return -403;}
-extern "C" int ra673_restore(){return -403;}
-extern "C" int ra673_apply(){return -403;}
-extern "C" int ra673_live_order(){return -403;}
-extern "C" int ra673_auto_update(){return -403;}
+extern "C" const char* ra673_version(){return "67.3-hotfix1";} extern "C" int ra673_core_ready(){return 1;} extern "C" int ra673_asset_data_ready(){return assetCount673==3?1:0;} extern "C" int ra673_write(){return-403;} extern "C" int ra673_delete(){return-403;} extern "C" int ra673_restore(){return-403;} extern "C" int ra673_apply(){return-403;} extern "C" int ra673_live_order(){return-403;} extern "C" int ra673_auto_update(){return-403;}
