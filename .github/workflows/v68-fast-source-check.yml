@@ -1,0 +1,26 @@
+name: V68 FAST MASTER Source Check
+
+on:
+  push:
+    branches:
+      - robot-admin-v681-mega
+    paths:
+      - 'app/src/main/cpp/**'
+      - '.github/workflows/v68-fast-source-check.yml'
+  workflow_dispatch:
+
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile pure C++ FAST MASTER harness
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            app/src/main/cpp/fast_master_sourcecheck_v687.cpp \
+            -o /tmp/robot_admin_v687_sourcecheck
+
+      - name: Run V68.1-V68.7 master regression
+        run: /tmp/robot_admin_v687_sourcecheck
