@@ -18,7 +18,7 @@ jobs:
 
       - name: Compile pure C++ FAST MASTER harness
         run: |
-          g++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
             app/src/main/cpp/fast_master_sourcecheck_v687.cpp \
             -o /tmp/robot_admin_v687_sourcecheck
 
