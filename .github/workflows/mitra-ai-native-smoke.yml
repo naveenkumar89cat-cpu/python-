@@ -1,0 +1,46 @@
+name: MITRA AI Native Smoke
+
+on:
+  push:
+    branches: [ robot-admin-v690-mitra-ai ]
+    paths:
+      - 'app/src/main/cpp/**'
+      - '.github/workflows/mitra-ai-native-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  mitra-native-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compile MITRA AI strict C++ smoke
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            app/src/main/cpp/mitra_ai_smoke_v690.cpp \
+            -o /tmp/mitra_ai_smoke_v690
+      - name: Run MITRA AI safety regression
+        run: /tmp/mitra_ai_smoke_v690
+
+  android-native-compile:
+    needs: mitra-native-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Compile Android native target only
+        run: gradle :app:externalNativeBuildDebug --stacktrace
+      - name: Verify MITRA AI and single NativeActivity entry
+        run: |
+          SO=$(find app/build -name 'librobot_admin_native_host_v688.so' -type f | head -1)
+          test -n "$SO"
+          COUNT=$(nm -D --defined-only "$SO" | awk '$3 == "ANativeActivity_onCreate" {count++} END {print count+0}')
+          test "$COUNT" -eq 1
+          strings "$SO" | grep -Fx '69.0-mitra-ai-offline-readonly'
+          strings "$SO" | grep -Fx 'V69.0 MITRA AI READY'
+

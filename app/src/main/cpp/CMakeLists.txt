@@ -4,6 +4,7 @@ project(robot_admin_native_host_v688)
 add_library(robot_admin_native_host_v688 SHARED
     native_activity_host_v680.cpp
     fast_master_integration_v688.cpp
+    mitra_ai_v690.cpp
 )
 
 find_library(android-lib android)
