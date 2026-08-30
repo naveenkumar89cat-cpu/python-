@@ -1,0 +1,57 @@
+name: V68.8 Final Android Checkpoint
+
+on:
+  push:
+    branches: [ robot-admin-v688-final ]
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - '.github/workflows/v68-final-android-build.yml'
+  workflow_dispatch:
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile strict C++ FAST MASTER gate
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            app/src/main/cpp/fast_master_sourcecheck_v687.cpp \
+            -o /tmp/robot_admin_v688_gate
+
+      - name: Run V68.1-V68.7 regression gate
+        run: /tmp/robot_admin_v688_gate
+
+  android-arm64-build:
+    needs: regression-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Compile final Android arm64 APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload V68.8 final checkpoint APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-admin-ai-os-v68.8-final-arm64-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
