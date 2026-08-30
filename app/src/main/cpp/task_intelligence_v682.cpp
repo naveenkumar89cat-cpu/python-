@@ -1,6 +1,6 @@
 // ROBOT ADMIN AI OS — V68.2 TASK INTELLIGENCE
 // Android-only, offline-first, read-only source module.
-// APK integration intentionally deferred until FAST MASTER checkpoint.
+// Supports both V68 pipe records and legacy plain-line task assets.
 
 #include <algorithm>
 #include <cctype>
@@ -61,8 +61,59 @@ static bool valid_status(const std::string& s) {
     return u == "PENDING" || u == "DONE" || u == "BLOCKED";
 }
 
-static bool parse_line(const std::string& line, TaskItem& out) {
-    // Format: ID|TITLE|PRIORITY|STATUS|NOTE
+static bool parse_key_value_line(const std::string& line, TaskItem& out) {
+    std::stringstream ss(line);
+    std::string field;
+    bool found = false;
+    while (std::getline(ss, field, '|')) {
+        const auto p = field.find(':');
+        if (p == std::string::npos) continue;
+        const auto key = upper(trim(field.substr(0, p)));
+        const auto value = trim(field.substr(p + 1));
+        if (key == "ID" || key == "TASK" || key == "TASK_ID") {
+            out.id = value;
+            if (out.title.empty()) out.title = value;
+            found = true;
+        } else if (key == "TITLE") {
+            out.title = value;
+            found = true;
+        } else if (key == "PRIORITY") {
+            out.priority = upper(value);
+            found = true;
+        } else if (key == "STATUS") {
+            out.status = upper(value);
+            found = true;
+        } else if (key == "NOTE") {
+            out.note = value;
+            found = true;
+        }
+    }
+    if (out.id.empty() && !out.title.empty()) out.id = out.title;
+    if (out.title.empty() && !out.id.empty()) out.title = out.id;
+    return found && !out.id.empty() && !out.title.empty();
+}
+
+static bool parse_line(const std::string& raw, TaskItem& out) {
+    const std::string line = trim(raw);
+    if (line.empty()) return false;
+
+    // Legacy V67.3 asset format: one task title per line.
+    if (line.find('|') == std::string::npos && line.find(':') == std::string::npos) {
+        out.id = line;
+        out.title = line;
+        out.priority = "NORMAL";
+        out.status = "PENDING";
+        return true;
+    }
+
+    // Legacy labelled format: ID:...|PRIORITY:...|STATUS:...|NOTE:...
+    if (line.find(':') != std::string::npos && parse_key_value_line(line, out)) {
+        if (!valid_priority(out.priority)) out.priority = "NORMAL";
+        if (!valid_status(out.status)) out.status = "PENDING";
+        return true;
+    }
+
+    // V68 format: ID|TITLE|PRIORITY|STATUS|NOTE
     std::vector<std::string> parts;
     std::string cur;
     for (char c : line) {
@@ -170,7 +221,6 @@ static std::vector<TaskItem> filter_priority(const std::vector<TaskItem>& tasks,
     return out;
 }
 
-// Permanent V68.x safety wall: intelligence only, no task mutation or execution.
 extern "C" int ra682_task_execute_blocked() { return ERR_BLOCKED; }
 extern "C" int ra682_task_create_blocked() { return ERR_BLOCKED; }
 extern "C" int ra682_task_update_blocked() { return ERR_BLOCKED; }
@@ -178,7 +228,7 @@ extern "C" int ra682_task_delete_blocked() { return ERR_BLOCKED; }
 extern "C" int ra682_task_schedule_blocked() { return ERR_BLOCKED; }
 
 extern "C" const char* ra682_task_engine_version() {
-    return "68.2-task-intelligence-readonly";
+    return "68.2-task-intelligence-readonly-legacy-compatible";
 }
 
 } // namespace ra682
