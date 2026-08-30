@@ -43,4 +43,7 @@ jobs:
           test "$COUNT" -eq 1
           strings "$SO" | grep -Fx '69.0-mitra-ai-offline-readonly'
           strings "$SO" | grep -Fx 'V69.0 MITRA AI READY'
-
+          strings "$SO" | grep -Fx 'MITRA APPROVAL GATE'
+          strings "$SO" | grep -Fx 'PREVIEW RESTORE'
+          strings "$SO" | grep -Fx 'APPROVED - EXECUTION BLOCKED'
+          strings "$SO" | grep -Fx 'CANCELLED - NO ACTION EXECUTED'
