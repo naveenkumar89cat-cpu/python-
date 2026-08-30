@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(robot_admin_native_host_v665)
+project(robot_admin_native_host_v670)
 
-add_library(robot_admin_native_host_v665 SHARED
-    native_activity_host_v665.cpp
+add_library(robot_admin_native_host_v670 SHARED
+    native_activity_host_v670.cpp
 )
 
 find_library(android-lib android)
@@ -10,10 +10,10 @@ find_library(log-lib log)
 find_library(egl-lib EGL)
 find_library(gles2-lib GLESv2)
 
-target_compile_features(robot_admin_native_host_v665 PRIVATE cxx_std_17)
-target_compile_options(robot_admin_native_host_v665 PRIVATE -O2 -Wall -Wextra)
+target_compile_features(robot_admin_native_host_v670 PRIVATE cxx_std_17)
+target_compile_options(robot_admin_native_host_v670 PRIVATE -O2 -Wall -Wextra)
 
-target_link_libraries(robot_admin_native_host_v665
+target_link_libraries(robot_admin_native_host_v670
     ${android-lib}
     ${log-lib}
     ${egl-lib}
