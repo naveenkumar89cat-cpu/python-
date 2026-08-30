@@ -1,0 +1,74 @@
+name: MITRA AI V69 Final APK
+
+on:
+  push:
+    branches: [ robot-admin-v690-mitra-ai ]
+    paths:
+      - 'app/src/main/cpp/**'
+      - 'app/build.gradle'
+      - '.github/workflows/mitra-ai-v690-final-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  source-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Strict MITRA C++ regression
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            app/src/main/cpp/mitra_ai_smoke_v690.cpp \
+            -o /tmp/mitra_ai_smoke_v690
+          /tmp/mitra_ai_smoke_v690
+      - name: Verify final source and safety locks
+        run: |
+          grep -Fx "        versionName '69.0-mitra-ai-unicode-final-debug'" app/build.gradle
+          grep -Fq 'extern "C" int ra690_mitra_executed_actions() { return 0; }' app/src/main/cpp/mitra_ai_v690.cpp
+          grep -Fq 'WRITE: OFF' app/src/main/cpp/native_activity_host_v680.cpp
+          grep -Fq 'DELETE: OFF' app/src/main/cpp/native_activity_host_v680.cpp
+          grep -Fq 'LIVE ORDERS: OFF' app/src/main/cpp/native_activity_host_v680.cpp
+          grep -Fq 'PROD GATE: CLOSED' app/src/main/cpp/native_activity_host_v680.cpp
+          test -z "$(find app/src -type f \( -name '*.java' -o -name '*.kt' \) -print -quit)"
+
+  android-final-apk:
+    needs: source-lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Build gated Android ARM64 APK
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Audit APK native core and safety strings
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/librobot_admin_native_host_v688.so'
+          unzip -p "$APK" lib/arm64-v8a/librobot_admin_native_host_v688.so > /tmp/librobot_admin_native_host_v688.so
+          readelf -h /tmp/librobot_admin_native_host_v688.so | grep -F 'AArch64'
+          COUNT=$(nm -D --defined-only /tmp/librobot_admin_native_host_v688.so | awk '$3 == "ANativeActivity_onCreate" {count++} END {print count+0}')
+          test "$COUNT" -eq 1
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx '69.0-mitra-ai-offline-readonly'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'V69.0 MITRA AI READY'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'INPUT [UNICODE IME ACTIVE]'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'MITRA APPROVAL GATE'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'WRITE: OFF'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'DELETE: OFF'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'RESTORE: OFF'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'LIVE ORDERS: OFF'
+          strings /tmp/librobot_admin_native_host_v688.so | grep -Fx 'PROD GATE: CLOSED'
+          sha256sum "$APK" | tee "$APK.sha256"
+      - name: Upload verified V69.0 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-admin-mitra-ai-v69.0-arm64-debug
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 14

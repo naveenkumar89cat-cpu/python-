@@ -11,8 +11,8 @@ android {
         applicationId 'com.robotadmin.aios'
         minSdk 21
         targetSdk 37
-        versionCode 30
-        versionName '68.8-fast-master-v680-host-debug'
+        versionCode 31
+        versionName '69.0-mitra-ai-unicode-final-debug'
         externalNativeBuild {
             cmake {
                 cppFlags '-std=c++17 -O2 -Wall -Wextra'
