@@ -52,3 +52,45 @@ jobs:
           COUNT=$(nm -D --defined-only "$SO" | awk '$3 == "ANativeActivity_onCreate" {count++} END {print count+0}')
           test "$COUNT" -eq 1
           strings "$SO" | grep -Fx '68.8-fast-master-integrated-readonly'
+
+  final-checkpoint-apk:
+    needs: android-native-compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build V68.8 final checkpoint APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Audit final APK
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'lib/arm64-v8a/librobot_admin_native_host_v688.so'
+          unzip -Z1 "$APK" | grep -Fx 'assets/v673/tasks.txt'
+          unzip -p "$APK" lib/arm64-v8a/librobot_admin_native_host_v688.so > /tmp/v688.so
+          strings /tmp/v688.so | grep -Fx '68.8-fast-master-integrated-readonly'
+          strings /tmp/v688.so | grep -Fx 'V68.8 FAST MASTER PASS'
+          sha256sum "$APK"
+
+      - name: Upload V68.8 final checkpoint APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-admin-v68.8-fast-master-final-arm64
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
