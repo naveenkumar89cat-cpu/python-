@@ -11,8 +11,8 @@ android {
         applicationId 'com.robotadmin.aios'
         minSdk 21
         targetSdk 37
-        versionCode 14
-        versionName '65.4-debug'
+        versionCode 15
+        versionName '65.5-debug'
         externalNativeBuild {
             cmake {
                 cppFlags '-std=c++17 -O2 -Wall -Wextra'
