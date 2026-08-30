@@ -47,3 +47,6 @@ jobs:
           strings "$SO" | grep -Fx 'PREVIEW RESTORE'
           strings "$SO" | grep -Fx 'APPROVED - EXECUTION BLOCKED'
           strings "$SO" | grep -Fx 'CANCELLED - NO ACTION EXECUTED'
+          strings "$SO" | grep -Fx 'CHAT INPUT'
+          strings "$SO" | grep -Fx 'TAP CHAT INPUT'
+          strings "$SO" | grep -Fx 'TYPE A COMMAND FIRST'
