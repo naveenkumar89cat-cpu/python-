@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:allowBackup="false" android:label="Robot Admin AI OS" android:hasCode="false" android:supportsRtl="true">
         <activity android:name="android.app.NativeActivity" android:exported="true" android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden">
-            <meta-data android:name="android.app.lib_name" android:value="robot_admin_native_host_v659" />
+            <meta-data android:name="android.app.lib_name" android:value="robot_admin_native_host_v660" />
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
     </application>
