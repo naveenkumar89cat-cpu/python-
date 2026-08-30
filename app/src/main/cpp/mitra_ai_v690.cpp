@@ -4,12 +4,15 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdint>
 #include <mutex>
 #include <string>
 
 namespace ra690 {
 
 enum class Intent { GREETING, STATUS, TASKS, BACKUP, SAFETY, APPROVAL_REQUIRED, UNKNOWN };
+enum class RiskAction { NONE, WRITE, DELETE_ACTION, RESTORE, APPLY, EXECUTE, LIVE_ORDER };
+enum class GateState { IDLE, PREVIEW_PENDING, APPROVED_LOCKED, CANCELLED };
 
 struct ConversationMemory {
     std::array<Intent, 8> recent{};
@@ -20,6 +23,16 @@ struct ConversationMemory {
 static ConversationMemory memory;
 static std::mutex memory_mutex;
 
+struct ApprovalGate {
+    GateState state = GateState::IDLE;
+    RiskAction action = RiskAction::NONE;
+    std::uint64_t request_id = 0;
+    std::string preview;
+};
+
+static ApprovalGate approval_gate;
+static std::mutex approval_mutex;
+
 static std::string lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
         return static_cast<char>(std::tolower(c));
@@ -27,14 +40,53 @@ static std::string lower_ascii(std::string value) {
     return value;
 }
 
+static std::string trim_ascii(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+static RiskAction risk_action(const std::string& input) {
+    const std::string text = lower_ascii(input);
+    if (text.find("live order") != std::string::npos) return RiskAction::LIVE_ORDER;
+    if (text.find("delete") != std::string::npos || input.find("ಅಳಿಸ") != std::string::npos)
+        return RiskAction::DELETE_ACTION;
+    if (text.find("restore") != std::string::npos || input.find("ರಿಸ್ಟೋರ್") != std::string::npos)
+        return RiskAction::RESTORE;
+    if (text.find("apply") != std::string::npos || input.find("ಅಪ್ಲೈ") != std::string::npos)
+        return RiskAction::APPLY;
+    if (text.find("execute") != std::string::npos) return RiskAction::EXECUTE;
+    if (text.find("write") != std::string::npos || input.find("ಬರೆಯ") != std::string::npos)
+        return RiskAction::WRITE;
+    return RiskAction::NONE;
+}
+
+static const char* risk_name(RiskAction action) {
+    switch (action) {
+        case RiskAction::WRITE: return "WRITE";
+        case RiskAction::DELETE_ACTION: return "DELETE";
+        case RiskAction::RESTORE: return "RESTORE";
+        case RiskAction::APPLY: return "APPLY";
+        case RiskAction::EXECUTE: return "EXECUTE";
+        case RiskAction::LIVE_ORDER: return "LIVE_ORDER";
+        default: return "NONE";
+    }
+}
+
+static bool is_approve_command(const std::string& input) {
+    const std::string command = lower_ascii(trim_ascii(input));
+    return command == "approve" || command == "ಅನುಮೋದಿಸು" || command == "ಒಪ್ಪಿಗೆ";
+}
+
+static bool is_cancel_command(const std::string& input) {
+    const std::string command = lower_ascii(trim_ascii(input));
+    return command == "cancel" || command == "ರದ್ದು" || command == "ರದ್ದುಮಾಡು";
+}
+
 Intent classify(const std::string& input) {
     const std::string text = lower_ascii(input);
-    if (text.find("write") != std::string::npos || text.find("delete") != std::string::npos ||
-        text.find("restore") != std::string::npos || text.find("apply") != std::string::npos ||
-        text.find("execute") != std::string::npos || text.find("live order") != std::string::npos ||
-        input.find("ಅಳಿಸ") != std::string::npos || input.find("ಬರೆಯ") != std::string::npos ||
-        input.find("ರಿಸ್ಟೋರ್") != std::string::npos || input.find("ಅಪ್ಲೈ") != std::string::npos)
-        return Intent::APPROVAL_REQUIRED;
+    if (risk_action(input) != RiskAction::NONE) return Intent::APPROVAL_REQUIRED;
     if (text.find("hello") != std::string::npos || text.find("hi") != std::string::npos ||
         input.find("ನಮಸ್ಕಾರ") != std::string::npos) return Intent::GREETING;
     if (text.find("status") != std::string::npos || input.find("ಸ್ಥಿತಿ") != std::string::npos)
@@ -65,7 +117,14 @@ static bool is_kannada(const std::string& input) {
         input.find("ಸ್ಥಿತಿ") != std::string::npos ||
         input.find("ಕೆಲಸ") != std::string::npos ||
         input.find("ಬ್ಯಾಕಪ್") != std::string::npos ||
-        input.find("ಸುರಕ್ಷ") != std::string::npos;
+        input.find("ಸುರಕ್ಷ") != std::string::npos ||
+        input.find("ಅಳಿಸ") != std::string::npos ||
+        input.find("ಬರೆಯ") != std::string::npos ||
+        input.find("ರಿಸ್ಟೋರ್") != std::string::npos ||
+        input.find("ಅಪ್ಲೈ") != std::string::npos ||
+        input.find("ಅನುಮೋದಿಸು") != std::string::npos ||
+        input.find("ಒಪ್ಪಿಗೆ") != std::string::npos ||
+        input.find("ರದ್ದು") != std::string::npos;
 }
 
 const char* reply_kannada(Intent intent) {
@@ -121,6 +180,62 @@ static Intent contextual_intent(const std::string& input) {
     return memory.last;
 }
 
+static std::string preview_command(const std::string& input, bool kannada) {
+    const RiskAction action = risk_action(input);
+    if (action == RiskAction::NONE) return {};
+    std::lock_guard<std::mutex> guard(approval_mutex);
+    if (approval_gate.state == GateState::PREVIEW_PENDING) {
+        return kannada
+            ? "ಒಂದು ಅನುಮೋದನೆ ಬಾಕಿಯಿದೆ. ಮೊದಲು APPROVE ಅಥವಾ CANCEL ಎಂದು ಉತ್ತರಿಸಿ."
+            : "An approval is pending. Reply APPROVE or CANCEL first.";
+    }
+    approval_gate.state = GateState::PREVIEW_PENDING;
+    approval_gate.action = action;
+    ++approval_gate.request_id;
+    approval_gate.preview = "PREVIEW #" + std::to_string(approval_gate.request_id) + ": " +
+        risk_name(action) + " | READ-ONLY | NO ACTION EXECUTED";
+    return kannada
+        ? approval_gate.preview + " | ಮುಂದುವರಿಸಲು APPROVE, ನಿಲ್ಲಿಸಲು CANCEL."
+        : approval_gate.preview + " | Reply APPROVE or CANCEL.";
+}
+
+static std::string approve_command(bool kannada) {
+    std::lock_guard<std::mutex> guard(approval_mutex);
+    if (approval_gate.state != GateState::PREVIEW_PENDING) {
+        return kannada ? "ಅನುಮೋದನೆಗೆ ಯಾವುದೇ ಬಾಕಿ ಆದೇಶವಿಲ್ಲ."
+                       : "No command is pending approval.";
+    }
+    const std::string action = risk_name(approval_gate.action);
+    approval_gate.state = GateState::APPROVED_LOCKED;
+    approval_gate.preview.clear();
+    return kannada
+        ? "APPROVED: " + action + " | ಓದಲು-ಮಾತ್ರ ಸುರಕ್ಷತಾ ಲಾಕ್ ಕಾರಣ ಕಾರ್ಯಗತವಾಗಿಲ್ಲ."
+        : "APPROVED: " + action + " | Execution remains blocked by the read-only safety lock.";
+}
+
+static std::string cancel_command(bool kannada) {
+    std::lock_guard<std::mutex> guard(approval_mutex);
+    if (approval_gate.state != GateState::PREVIEW_PENDING) {
+        return kannada ? "ರದ್ದು ಮಾಡಲು ಯಾವುದೇ ಬಾಕಿ ಆದೇಶವಿಲ್ಲ."
+                       : "No command is pending cancellation.";
+    }
+    const std::string action = risk_name(approval_gate.action);
+    approval_gate.state = GateState::CANCELLED;
+    approval_gate.preview.clear();
+    return kannada
+        ? "CANCELLED: " + action + " | ಯಾವುದೇ ಕಾರ್ಯ ನಡೆದಿಲ್ಲ."
+        : "CANCELLED: " + action + " | No action was executed.";
+}
+
+static const char* gate_state_name(GateState state) {
+    switch (state) {
+        case GateState::PREVIEW_PENDING: return "PREVIEW_PENDING";
+        case GateState::APPROVED_LOCKED: return "APPROVED_LOCKED";
+        case GateState::CANCELLED: return "CANCELLED";
+        default: return "IDLE";
+    }
+}
+
 } // namespace ra690
 
 extern "C" const char* ra690_mitra_version() {
@@ -141,9 +256,22 @@ extern "C" int ra690_mitra_selftest() {
 extern "C" const char* ra690_mitra_respond(const char* input) {
     thread_local std::string response;
     const std::string request = input == nullptr ? "" : input;
+    const bool kannada = ra690::is_kannada(request);
+    if (ra690::is_approve_command(request)) {
+        response = ra690::approve_command(kannada);
+        return response.c_str();
+    }
+    if (ra690::is_cancel_command(request)) {
+        response = ra690::cancel_command(kannada);
+        return response.c_str();
+    }
+    if (ra690::risk_action(request) != ra690::RiskAction::NONE) {
+        response = ra690::preview_command(request, kannada);
+        return response.c_str();
+    }
     const auto intent = ra690::contextual_intent(request);
     ra690::remember(intent);
-    response = ra690::is_kannada(request) ? ra690::reply_kannada(intent) : ra690::reply(intent);
+    response = kannada ? ra690::reply_kannada(intent) : ra690::reply(intent);
     return response.c_str();
 }
 
@@ -160,6 +288,32 @@ extern "C" const char* ra690_mitra_last_intent() {
 extern "C" int ra690_mitra_approval_required(const char* input) {
     return ra690::classify(input == nullptr ? "" : input) == ra690::Intent::APPROVAL_REQUIRED ? 1 : 0;
 }
+
+extern "C" const char* ra690_mitra_gate_state() {
+    std::lock_guard<std::mutex> guard(ra690::approval_mutex);
+    return ra690::gate_state_name(ra690::approval_gate.state);
+}
+
+extern "C" const char* ra690_mitra_pending_action() {
+    std::lock_guard<std::mutex> guard(ra690::approval_mutex);
+    return ra690::approval_gate.state == ra690::GateState::PREVIEW_PENDING
+        ? ra690::risk_name(ra690::approval_gate.action) : "NONE";
+}
+
+extern "C" const char* ra690_mitra_pending_preview() {
+    thread_local std::string preview;
+    std::lock_guard<std::mutex> guard(ra690::approval_mutex);
+    preview = ra690::approval_gate.state == ra690::GateState::PREVIEW_PENDING
+        ? ra690::approval_gate.preview : "";
+    return preview.c_str();
+}
+
+extern "C" int ra690_mitra_has_pending_approval() {
+    std::lock_guard<std::mutex> guard(ra690::approval_mutex);
+    return ra690::approval_gate.state == ra690::GateState::PREVIEW_PENDING ? 1 : 0;
+}
+
+extern "C" int ra690_mitra_executed_actions() { return 0; }
 
 extern "C" int ra690_mitra_write_blocked() { return -403; }
 extern "C" int ra690_mitra_delete_blocked() { return -403; }
