@@ -17,9 +17,38 @@ jobs:
 
       - name: Compile V68.8 FAST MASTER smoke test
         run: |
-          clang++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+          clang++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
             app/src/main/cpp/fast_master_smoke_v688.cpp \
             -o /tmp/fast_master_smoke_v688
 
       - name: Run V68.8 FAST MASTER regression
         run: /tmp/fast_master_smoke_v688
+
+  android-native-compile:
+    needs: native-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Compile Android V68.8 native target only
+        run: gradle :app:externalNativeBuildDebug --stacktrace
+
+      - name: Verify single NativeActivity entry point
+        run: |
+          SO=$(find app/build -name 'librobot_admin_native_host_v688.so' -type f | head -1)
+          test -n "$SO"
+          COUNT=$(readelf -Ws "$SO" | awk '$8 == "ANativeActivity_onCreate" {count++} END {print count+0}')
+          test "$COUNT" -eq 1
+          strings "$SO" | grep -Fx '68.8-fast-master-integrated-readonly'
