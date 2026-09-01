@@ -1,0 +1,31 @@
+name: V69.3 A9 Offline AI Safe Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/offline_ai_router_v693.cpp'
+      - 'app/src/main/cpp/a9_ai_smoke_v693.cpp'
+      - '.github/workflows/a9-ai-smoke-v693.yml'
+  workflow_dispatch:
+
+jobs:
+  ai-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated AI smoke
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra \
+            app/src/main/cpp/a9_ai_smoke_v693.cpp \
+            -o /tmp/a9_ai_smoke_v693
+      - name: Run offline AI safety gates
+        run: /tmp/a9_ai_smoke_v693
+      - name: Robot Admin isolation check
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|broker login|placeOrder|order.place' \
+            app/src/main/cpp/offline_ai_router_v693.cpp \
+            app/src/main/cpp/a9_ai_smoke_v693.cpp; then
+            echo 'External trading integration reference detected in A9 files'
+            exit 1
+          fi
+          echo 'ROBOT ADMIN A9 ISOLATION PASS'
