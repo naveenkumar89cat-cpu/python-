@@ -1,0 +1,24 @@
+name: V70.0 Final Release Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/final_release_bundle_v700.cpp'
+      - 'app/src/main/cpp/final_release_smoke_v700.cpp'
+      - 'docs/ROBOT_ADMIN_OWNER_MANUAL_KN_V700.md'
+      - '.github/workflows/final-release-smoke-v700.yml'
+  workflow_dispatch:
+jobs:
+  final-release-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/final_release_smoke_v700.cpp -o /tmp/final_release_smoke
+      - name: Verify final release gates
+        run: /tmp/final_release_smoke
+      - name: Documentation presence
+        run: test -s docs/ROBOT_ADMIN_OWNER_MANUAL_KN_V700.md
+      - name: Trading isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/final_release_bundle_v700.cpp app/src/main/cpp/final_release_smoke_v700.cpp docs/ROBOT_ADMIN_OWNER_MANUAL_KN_V700.md; then exit 1; fi
+          echo 'FINAL RELEASE ISOLATION PASS'
