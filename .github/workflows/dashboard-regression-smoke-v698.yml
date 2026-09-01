@@ -1,0 +1,21 @@
+name: V69.8 Dashboard Regression Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/dashboard_regression_bundle_v698.cpp'
+      - 'app/src/main/cpp/dashboard_regression_smoke_v698.cpp'
+      - '.github/workflows/dashboard-regression-smoke-v698.yml'
+  workflow_dispatch:
+jobs:
+  dashboard-regression-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/dashboard_regression_smoke_v698.cpp -o /tmp/dashboard_regression
+      - name: Verify dashboard and regression gates
+        run: /tmp/dashboard_regression
+      - name: Robot Admin isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/dashboard_regression_bundle_v698.cpp app/src/main/cpp/dashboard_regression_smoke_v698.cpp; then exit 1; fi
+          echo 'DASHBOARD REGRESSION ISOLATION PASS'
