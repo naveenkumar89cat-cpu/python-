@@ -1,0 +1,21 @@
+name: V69.7 Recovery Resource Time Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/recovery_time_bundle_v697.cpp'
+      - 'app/src/main/cpp/recovery_time_smoke_v697.cpp'
+      - '.github/workflows/recovery-time-smoke-v697.yml'
+  workflow_dispatch:
+jobs:
+  recovery-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/recovery_time_smoke_v697.cpp -o /tmp/recovery_time
+      - name: Verify recovery resource time gates
+        run: /tmp/recovery_time
+      - name: Robot Admin isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/recovery_time_bundle_v697.cpp app/src/main/cpp/recovery_time_smoke_v697.cpp; then exit 1; fi
+          echo 'RECOVERY TIME ISOLATION PASS'
