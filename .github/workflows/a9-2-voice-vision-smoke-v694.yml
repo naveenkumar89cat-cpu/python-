@@ -1,0 +1,31 @@
+name: V69.4 A9.2 Voice Vision Safe Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/voice_vision_interface_v694.cpp'
+      - 'app/src/main/cpp/a9_2_voice_vision_smoke_v694.cpp'
+      - '.github/workflows/a9-2-voice-vision-smoke-v694.yml'
+  workflow_dispatch:
+
+jobs:
+  voice-vision-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated voice vision smoke
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra \
+            app/src/main/cpp/a9_2_voice_vision_smoke_v694.cpp \
+            -o /tmp/a9_2_voice_vision_smoke_v694
+      - name: Run media safety gates
+        run: /tmp/a9_2_voice_vision_smoke_v694
+      - name: Robot Admin isolation check
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|broker login|placeOrder|order.place' \
+            app/src/main/cpp/voice_vision_interface_v694.cpp \
+            app/src/main/cpp/a9_2_voice_vision_smoke_v694.cpp; then
+            echo 'External trading integration reference detected in A9.2 files'
+            exit 1
+          fi
+          echo 'ROBOT ADMIN A9.2 ISOLATION PASS'
