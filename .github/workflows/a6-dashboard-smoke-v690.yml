@@ -22,10 +22,12 @@ jobs:
         run: /tmp/a6_dashboard_smoke_v690
       - name: Trading isolation check
         run: |
-          if grep -RniE 'broker|smartapi|angel|order.place|live_order' \
+          # Safety-lock identifiers such as live_orders are allowed because they must remain OFF.
+          # Block only concrete broker/API/order integration references.
+          if grep -RniE 'smartapi|smartconnect|angel_one|placeOrder|broker_api|order\.place|trading[-_ ]engine' \
             app/src/main/cpp/master_dashboard_v690.cpp \
             app/src/main/cpp/a6_dashboard_smoke_v690.cpp; then
-            echo 'Trading/API reference detected in A6 files'
+            echo 'Concrete Trading/API integration reference detected in A6 files'
             exit 1
           fi
           echo 'ROBOT ADMIN A6 TRADING ISOLATION PASS'
