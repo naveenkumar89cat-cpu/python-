@@ -1,0 +1,33 @@
+name: V68.9 A4+A5 Safe Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/build_test_verifier_v689.cpp'
+      - 'app/src/main/cpp/backup_checkpoint_v689.cpp'
+      - 'app/src/main/cpp/a4_a5_smoke_v689.cpp'
+      - '.github/workflows/a4-a5-safe-smoke-v689.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated verifier smoke
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -pedantic \
+            app/src/main/cpp/a4_a5_smoke_v689.cpp \
+            -o /tmp/a4_a5_smoke_v689
+      - name: Run safety gates
+        run: /tmp/a4_a5_smoke_v689
+      - name: Confirm trading isolation
+        run: |
+          ! grep -RniE 'Trading-|broker|live[ _-]?order|SmartAPI|Angel One' \
+            app/src/main/cpp/build_test_verifier_v689.cpp \
+            app/src/main/cpp/backup_checkpoint_v689.cpp \
+            app/src/main/cpp/a4_a5_smoke_v689.cpp
