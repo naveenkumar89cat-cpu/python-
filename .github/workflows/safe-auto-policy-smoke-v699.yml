@@ -1,0 +1,21 @@
+name: V69.9 Safe Auto Policy Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/safe_auto_policy_bundle_v699.cpp'
+      - 'app/src/main/cpp/safe_auto_policy_smoke_v699.cpp'
+      - '.github/workflows/safe-auto-policy-smoke-v699.yml'
+  workflow_dispatch:
+jobs:
+  safe-auto-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/safe_auto_policy_smoke_v699.cpp -o /tmp/safe_auto_policy
+      - name: Verify gates
+        run: /tmp/safe_auto_policy
+      - name: Robot Admin isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/safe_auto_policy_bundle_v699.cpp app/src/main/cpp/safe_auto_policy_smoke_v699.cpp; then exit 1; fi
+          echo 'SAFE AUTO POLICY ISOLATION PASS'
