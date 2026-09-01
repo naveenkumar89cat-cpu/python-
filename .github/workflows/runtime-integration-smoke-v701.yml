@@ -1,0 +1,24 @@
+name: V70.1 Runtime Integration Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/runtime_integration_v701.cpp'
+      - 'app/src/main/cpp/runtime_integration_smoke_v701.cpp'
+      - 'app/src/main/cpp/CMakeLists.txt'
+      - '.github/workflows/runtime-integration-smoke-v701.yml'
+  workflow_dispatch:
+jobs:
+  runtime-integration-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile runtime gate smoke
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/runtime_integration_smoke_v701.cpp -o /tmp/runtime_integration_smoke
+      - name: Verify runtime integration gates
+        run: /tmp/runtime_integration_smoke
+      - name: Verify CMake wiring
+        run: grep -q 'runtime_integration_v701.cpp' app/src/main/cpp/CMakeLists.txt
+      - name: Trading isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/runtime_integration_v701.cpp app/src/main/cpp/runtime_integration_smoke_v701.cpp; then exit 1; fi
+          echo 'R1 RUNTIME ISOLATION PASS'
