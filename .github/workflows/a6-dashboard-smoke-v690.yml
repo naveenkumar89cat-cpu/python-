@@ -1,0 +1,31 @@
+name: V69.0 A6 Dashboard Safe Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/master_dashboard_v690.cpp'
+      - 'app/src/main/cpp/a6_dashboard_smoke_v690.cpp'
+      - '.github/workflows/a6-dashboard-smoke-v690.yml'
+  workflow_dispatch:
+
+jobs:
+  dashboard-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated dashboard smoke
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra \
+            app/src/main/cpp/a6_dashboard_smoke_v690.cpp \
+            -o /tmp/a6_dashboard_smoke_v690
+      - name: Run dashboard safety gates
+        run: /tmp/a6_dashboard_smoke_v690
+      - name: Trading isolation check
+        run: |
+          if grep -RniE 'broker|smartapi|angel|order.place|live_order' \
+            app/src/main/cpp/master_dashboard_v690.cpp \
+            app/src/main/cpp/a6_dashboard_smoke_v690.cpp; then
+            echo 'Trading/API reference detected in A6 files'
+            exit 1
+          fi
+          echo 'ROBOT ADMIN A6 TRADING ISOLATION PASS'
