@@ -1,0 +1,21 @@
+name: V69.5 Foundation Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/foundation_bundle_v695.cpp'
+      - 'app/src/main/cpp/foundation_smoke_v695.cpp'
+      - '.github/workflows/foundation-smoke-v695.yml'
+  workflow_dispatch:
+jobs:
+  foundation-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/foundation_smoke_v695.cpp -o /tmp/foundation_smoke
+      - name: Verify isolation state acceptance
+        run: /tmp/foundation_smoke
+      - name: Trading integration isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/foundation_bundle_v695.cpp app/src/main/cpp/foundation_smoke_v695.cpp; then exit 1; fi
+          echo 'FOUNDATION ISOLATION PASS'
