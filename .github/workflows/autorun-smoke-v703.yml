@@ -1,0 +1,24 @@
+name: V70.3 Auto-Run Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/autorun_engine_v703.cpp'
+      - 'app/src/main/cpp/autorun_smoke_v703.cpp'
+      - 'app/src/main/cpp/CMakeLists.txt'
+      - '.github/workflows/autorun-smoke-v703.yml'
+  workflow_dispatch:
+jobs:
+  autorun-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile auto-run smoke
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/autorun_smoke_v703.cpp -o /tmp/autorun_smoke
+      - name: Verify auto-run safety gates
+        run: /tmp/autorun_smoke
+      - name: Verify CMake wiring
+        run: grep -q 'autorun_engine_v703.cpp' app/src/main/cpp/CMakeLists.txt
+      - name: Trading isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/autorun_engine_v703.cpp app/src/main/cpp/autorun_smoke_v703.cpp; then exit 1; fi
+          echo 'R3 AUTORUN ISOLATION PASS'
