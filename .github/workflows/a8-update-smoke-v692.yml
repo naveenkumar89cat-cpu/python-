@@ -1,0 +1,31 @@
+name: V69.2 A8 Controlled Update Safe Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/controlled_update_v692.cpp'
+      - 'app/src/main/cpp/a8_update_smoke_v692.cpp'
+      - '.github/workflows/a8-update-smoke-v692.yml'
+  workflow_dispatch:
+
+jobs:
+  update-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated update smoke
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra \
+            app/src/main/cpp/a8_update_smoke_v692.cpp \
+            -o /tmp/a8_update_smoke_v692
+      - name: Run controlled update safety gates
+        run: /tmp/a8_update_smoke_v692
+      - name: Robot Admin isolation check
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|broker login|placeOrder|order.place' \
+            app/src/main/cpp/controlled_update_v692.cpp \
+            app/src/main/cpp/a8_update_smoke_v692.cpp; then
+            echo 'External trading integration reference detected in A8 files'
+            exit 1
+          fi
+          echo 'ROBOT ADMIN A8 ISOLATION PASS'
