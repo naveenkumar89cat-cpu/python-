@@ -1,0 +1,24 @@
+name: V70.2 Persistence Isolation Safe Smoke
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/cpp/persistence_isolation_v702.cpp'
+      - 'app/src/main/cpp/persistence_isolation_smoke_v702.cpp'
+      - 'app/src/main/cpp/CMakeLists.txt'
+      - '.github/workflows/persistence-isolation-smoke-v702.yml'
+  workflow_dispatch:
+jobs:
+  persistence-isolation-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile persistence isolation smoke
+        run: c++ -std=c++17 -O2 -Wall -Wextra app/src/main/cpp/persistence_isolation_smoke_v702.cpp -o /tmp/persistence_isolation_smoke
+      - name: Verify persistence and isolation gates
+        run: /tmp/persistence_isolation_smoke
+      - name: Verify CMake wiring
+        run: grep -q 'persistence_isolation_v702.cpp' app/src/main/cpp/CMakeLists.txt
+      - name: Trading isolation
+        run: |
+          if grep -RniE 'SmartConnect|SmartAPI|Angel One|placeOrder|order.place' app/src/main/cpp/persistence_isolation_v702.cpp app/src/main/cpp/persistence_isolation_smoke_v702.cpp; then exit 1; fi
+          echo 'R2 PERSISTENCE ISOLATION PASS'
